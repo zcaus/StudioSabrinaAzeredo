@@ -140,18 +140,19 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     <div className="space-y-6">
       {/* Filters and Stats */}
       <div className="bg-white rounded-xl shadow-sm p-4 border border-[#A0814A]/20">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2 mb-4">
           <select 
             value={selectedMonth} 
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer"
+            className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none hover:opacity-80 transition"
           >
             {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
           </select>
+          <span className="text-[#A0814A]/40 text-lg font-light">/</span>
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="text-sm text-gray-500 bg-transparent outline-none"
+            className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none hover:opacity-80 transition"
           >
             {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
