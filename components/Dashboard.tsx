@@ -13,15 +13,19 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<RevenueStats>({ predicted: 0, realized: 0 });
+  
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+  
   // Form State
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formServiceId, setFormServiceId] = useState('');
   const [formDate, setFormDate] = useState('');
   const [formTime, setFormTime] = useState('');
+  const [formNotes, setFormNotes] = useState('');
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -67,14 +71,20 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este agendamento permanentemente?")) {
-        try {
-            await dataManager.deleteAppointment(id);
-            fetchAppointments();
-        } catch(e) {
-            alert("Erro ao excluir agendamento");
-        }
+  // Abre o modal de confirmação
+  const handleDeleteRequest = (id: string) => {
+    setDeleteConfirmationId(id);
+  };
+
+  // Executa a exclusão de fato
+  const confirmDelete = async () => {
+    if (!deleteConfirmationId) return;
+    try {
+      await dataManager.deleteAppointment(deleteConfirmationId);
+      setDeleteConfirmationId(null);
+      fetchAppointments();
+    } catch(e) {
+      alert("Erro ao excluir agendamento");
     }
   };
 
@@ -83,6 +93,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     setFormName(appt.client_name);
     setFormPhone(appt.client_phone || '');
     setFormServiceId(appt.service_id);
+    setFormNotes(appt.notes || '');
     const d = new Date(appt.date);
     setFormDate(d.toISOString().split('T')[0]);
     // Adjust logic to ensure time is correct regardless of timezone offset for the input
@@ -99,6 +110,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     setFormServiceId(services[0]?.id || '');
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormTime('09:00');
+    setFormNotes('');
     setIsModalOpen(true);
   };
 
@@ -117,7 +129,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
           client_name: formName,
           client_phone: formPhone,
           service_id: formServiceId,
-          date: dateTime
+          date: dateTime,
+          notes: formNotes
         });
       } else {
         await dataManager.addAppointment({
@@ -125,7 +138,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
           client_phone: formPhone,
           service_id: formServiceId,
           date: dateTime,
-          status: AppointmentStatus.PENDING
+          status: AppointmentStatus.PENDING,
+          notes: formNotes
         });
       }
       setIsModalOpen(false);
@@ -140,30 +154,32 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     <div className="space-y-6">
       {/* Filters and Stats */}
       <div className="bg-white rounded-xl shadow-sm p-4 border border-[#A0814A]/20">
-        <div className="flex items-center gap-2 mb-4">
-          <select 
-            value={selectedMonth} 
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none hover:opacity-80 transition"
-          >
-            {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-          </select>
-          <span className="text-[#A0814A]/40 text-lg font-light">/</span>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none hover:opacity-80 transition"
-          >
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none"
+            >
+              {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+            </select>
+            <span className="text-[#A0814A] font-bold">/</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="text-lg font-bold text-[#A0814A] bg-transparent outline-none cursor-pointer appearance-none"
+            >
+              {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[#A0814A]/10 p-3 rounded-lg text-center">
+          <div className="bg-[#A0814A]/10 p-3 rounded-lg text-center transition-transform hover:scale-[1.02]">
             <p className="text-xs text-[#A0814A]/60 uppercase font-bold tracking-wider">A Receber</p>
             <p className="text-xl font-bold text-[#A0814A]">R$ {stats.predicted.toFixed(2)}</p>
           </div>
-          <div className="bg-green-50 p-3 rounded-lg text-center">
+          <div className="bg-green-50 p-3 rounded-lg text-center transition-transform hover:scale-[1.02]">
             <p className="text-xs text-green-500 uppercase font-bold tracking-wider">Faturamento</p>
             <p className="text-xl font-bold text-green-700">R$ {stats.realized.toFixed(2)}</p>
           </div>
@@ -187,7 +203,12 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
             const isCancelled = appt.status === AppointmentStatus.CANCELLED;
 
             return (
-              <div key={appt.id} className={`bg-white rounded-xl p-4 shadow-sm border-l-4 ${isCompleted ? 'border-green-400' : isCancelled ? 'border-red-400' : 'border-[#A0814A]'}`}>
+              <div 
+                key={appt.id} 
+                className={`bg-white rounded-xl p-4 shadow-sm border-l-4 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 ${
+                  isCompleted ? 'border-green-400' : isCancelled ? 'border-red-400' : 'border-[#A0814A]'
+                }`}
+              >
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="font-bold text-gray-800 text-lg">{appt.client_name}</h3>
@@ -204,33 +225,42 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
                 </div>
 
                 {appt.client_phone && (
-                  <p className="text-xs text-gray-500 mb-3 flex items-center">
+                  <p className="text-xs text-gray-500 mb-2 flex items-center">
                     📱 {appt.client_phone}
                   </p>
+                )}
+
+                {/* Notas do Agendamento */}
+                {appt.notes && (
+                  <div className="bg-gray-50 p-2 rounded-md mb-3 border border-gray-100">
+                    <p className="text-xs text-gray-600 italic">
+                      <span className="font-semibold not-italic">Obs:</span> {appt.notes}
+                    </p>
+                  </div>
                 )}
                 
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 overflow-x-auto pb-1">
                    {appt.status === AppointmentStatus.PENDING && (
                      <>
-                        <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.COMPLETED)} className="flex-1 bg-green-100 text-green-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-green-200 whitespace-nowrap">
+                        <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.COMPLETED)} className="flex-1 bg-green-100 text-green-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-green-200 active:scale-95 transition-transform whitespace-nowrap">
                           Concluir
                         </button>
-                        <button onClick={() => handleEdit(appt)} className="flex-1 bg-blue-100 text-blue-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-blue-200 whitespace-nowrap">
+                        <button onClick={() => handleEdit(appt)} className="flex-1 bg-blue-100 text-blue-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-blue-200 active:scale-95 transition-transform whitespace-nowrap">
                           Editar
                         </button>
-                        <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.CANCELLED)} className="flex-1 bg-red-100 text-red-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-red-200 whitespace-nowrap">
+                        <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.CANCELLED)} className="flex-1 bg-red-100 text-red-700 text-xs py-2 px-3 rounded-lg font-semibold hover:bg-red-200 active:scale-95 transition-transform whitespace-nowrap">
                           Cancelar
                         </button>
                      </>
                    )}
                    {appt.status !== AppointmentStatus.PENDING && (
                       <div className="flex gap-2 w-full">
-                         <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.PENDING)} className="flex-1 bg-gray-100 text-gray-600 text-xs py-2 px-3 rounded-lg hover:bg-gray-200 whitespace-nowrap font-medium">
+                         <button onClick={() => handleStatusChange(appt.id, AppointmentStatus.PENDING)} className="flex-1 bg-gray-100 text-gray-600 text-xs py-2 px-3 rounded-lg hover:bg-gray-200 active:scale-95 transition-transform whitespace-nowrap font-medium">
                            Reabrir
                          </button>
                          {/* Botão de Lixeira visível apenas quando Cancelado */}
                          {appt.status === AppointmentStatus.CANCELLED && (
-                             <button onClick={() => handleDelete(appt.id)} className="w-14 bg-red-50 text-red-500 text-xs py-2 px-2 rounded-lg hover:bg-red-100 flex items-center justify-center border border-red-200" aria-label="Excluir Permanentemente">
+                             <button onClick={() => handleDeleteRequest(appt.id)} className="w-14 bg-red-50 text-red-500 text-xs py-2 px-2 rounded-lg hover:bg-red-100 active:scale-95 transition-transform flex items-center justify-center border border-red-200" aria-label="Excluir Permanentemente">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                 </svg>
@@ -258,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
       {/* Modal Form */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-800 mb-4">{editingId ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -317,12 +347,47 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Notas / Observações</label>
+                <textarea 
+                  value={formNotes} 
+                  onChange={e => setFormNotes(e.target.value)} 
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:border-[#A0814A] outline-none resize-none h-20" 
+                  placeholder="Detalhes adicionais (opcional)..."
+                />
+              </div>
+
               <div className="flex gap-2 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-gray-600 font-semibold bg-gray-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 text-white font-semibold bg-[#A0814A] rounded-lg shadow-md hover:bg-[#856a3b]">Salvar</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-gray-600 font-semibold bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 text-white font-semibold bg-[#A0814A] rounded-lg shadow-md hover:bg-[#856a3b] transition-colors">Salvar</button>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmationId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in">
+              <div className="text-center mb-6">
+                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 text-red-500">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                 </div>
+                 <h2 className="text-xl font-bold text-gray-800">Excluir Agendamento?</h2>
+                 <p className="text-gray-500 text-sm mt-2">Esta ação removerá permanentemente o agendamento. Não é possível desfazer.</p>
+              </div>
+              <div className="flex gap-3">
+                 <button onClick={() => setDeleteConfirmationId(null)} className="flex-1 py-3 text-gray-700 font-semibold bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
+                    Cancelar
+                 </button>
+                 <button onClick={confirmDelete} className="flex-1 py-3 text-white font-semibold bg-red-500 rounded-xl hover:bg-red-600 shadow-md transition-colors">
+                    Excluir
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>

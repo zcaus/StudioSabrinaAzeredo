@@ -11,7 +11,6 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple PIN protection
     if (password === '2805') {
       onLogin();
     } else {

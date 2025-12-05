@@ -44,17 +44,17 @@ class DataManager {
     return newService;
   }
 
-  async updateService(id: string, service: Partial<Service>): Promise<void> {
+  async updateService(id: string, updates: Partial<Service>): Promise<void> {
     const sb = getSupabase();
     if (sb) {
-      const { error } = await sb.from('services').update(service).eq('id', id);
+      const { error } = await sb.from('services').update(updates).eq('id', id);
       if (error) throw error;
       return;
     }
     // Local
     const services = await this.getServices();
-    const updated = services.map(s => s.id === id ? { ...s, ...service } : s);
-    localStorage.setItem(LS_SERVICES, JSON.stringify(updated));
+    const updatedServices = services.map(s => s.id === id ? { ...s, ...updates } : s);
+    localStorage.setItem(LS_SERVICES, JSON.stringify(updatedServices));
   }
 
   async deleteService(id: string): Promise<void> {
