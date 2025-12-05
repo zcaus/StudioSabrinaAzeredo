@@ -14,6 +14,9 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<RevenueStats>({ predicted: 0, realized: 0 });
   
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
@@ -26,6 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
   const [formDate, setFormDate] = useState('');
   const [formTime, setFormTime] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [formDepositPaid, setFormDepositPaid] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -45,17 +49,32 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
   }, [fetchAppointments]);
 
   const calculateStats = (data: Appointment[]) => {
-    let predicted = 0;
-    let realized = 0;
+    let predicted = 0; // A Receber
+    let realized = 0;  // Faturamento (Dinheiro em caixa)
 
     data.forEach(appt => {
       const service = services.find(s => s.id === appt.service_id);
       const price = service ? service.price : 0;
-      
+      const deposit = price * 0.30; // 30% do valor
+
       if (appt.status === AppointmentStatus.COMPLETED) {
+        // Se completou, o valor total é faturamento (independente de como foi pago o sinal)
         realized += price;
       } else if (appt.status === AppointmentStatus.PENDING) {
-        predicted += price;
+        if (appt.deposit_paid) {
+            // Sinal pago conta como faturamento
+            realized += deposit;
+            // O restante (70%) fica a receber
+            predicted += (price - deposit);
+        } else {
+            // Nada pago, tudo a receber
+            predicted += price;
+        }
+      } else if (appt.status === AppointmentStatus.CANCELLED) {
+        // Se cancelou mas o sinal foi pago, consideramos que o sinal ficou para o salão (regra comum)
+        if (appt.deposit_paid) {
+            realized += deposit;
+        }
       }
     });
 
@@ -94,12 +113,14 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     setFormPhone(appt.client_phone || '');
     setFormServiceId(appt.service_id);
     setFormNotes(appt.notes || '');
+    setFormDepositPaid(!!appt.deposit_paid);
+    
     const d = new Date(appt.date);
     setFormDate(d.toISOString().split('T')[0]);
-    // Adjust logic to ensure time is correct regardless of timezone offset for the input
     const hours = String(d.getHours()).padStart(2, '0');
     const minutes = String(d.getMinutes()).padStart(2, '0');
     setFormTime(`${hours}:${minutes}`);
+    
     setIsModalOpen(true);
   };
 
@@ -111,6 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
     setFormDate(new Date().toISOString().split('T')[0]);
     setFormTime('09:00');
     setFormNotes('');
+    setFormDepositPaid(false); // Padrão não pago
     setIsModalOpen(true);
   };
 
@@ -130,7 +152,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
           client_phone: formPhone,
           service_id: formServiceId,
           date: dateTime,
-          notes: formNotes
+          notes: formNotes,
+          deposit_paid: formDepositPaid
         });
       } else {
         await dataManager.addAppointment({
@@ -139,7 +162,8 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
           service_id: formServiceId,
           date: dateTime,
           status: AppointmentStatus.PENDING,
-          notes: formNotes
+          notes: formNotes,
+          deposit_paid: formDepositPaid
         });
       }
       setIsModalOpen(false);
@@ -149,6 +173,16 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
       alert("Erro ao salvar agendamento");
     }
   };
+
+  // Obter preço do serviço selecionado no formulário para mostrar os 30%
+  const selectedServicePrice = services.find(s => s.id === formServiceId)?.price || 0;
+  const depositValue = selectedServicePrice * 0.30;
+
+  // Filter Logic
+  const filteredAppointments = appointments.filter(appt => 
+    appt.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (appt.client_phone && appt.client_phone.includes(searchTerm))
+  );
 
   return (
     <div className="space-y-6">
@@ -188,19 +222,38 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
 
       {/* Appointment List */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 ml-1">Agendamentos</h2>
+        <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-500 ml-1">Agendamentos</h2>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative">
+            <input 
+                type="text" 
+                placeholder="Buscar cliente..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full p-3 pl-10 bg-white border border-gray-200 rounded-xl focus:border-[#A0814A] outline-none text-sm shadow-sm placeholder-gray-400"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400 absolute left-3 top-3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+        </div>
+
         {loading ? (
            <div className="text-center py-10 text-gray-400">Carregando...</div>
-        ) : appointments.length === 0 ? (
+        ) : filteredAppointments.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-xl border border-dashed border-gray-300 text-gray-400">
-            Nenhum agendamento para este mês.
+            {searchTerm ? 'Nenhum cliente encontrado.' : 'Nenhum agendamento para este mês.'}
           </div>
         ) : (
-          appointments.map(appt => {
+          filteredAppointments.map(appt => {
             const service = services.find(s => s.id === appt.service_id);
             const dateObj = new Date(appt.date);
             const isCompleted = appt.status === AppointmentStatus.COMPLETED;
             const isCancelled = appt.status === AppointmentStatus.CANCELLED;
+            const servicePrice = service ? service.price : 0;
+            const depositAmount = servicePrice * 0.30;
 
             return (
               <div 
@@ -228,6 +281,23 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
                   <p className="text-xs text-gray-500 mb-2 flex items-center">
                     📱 {appt.client_phone}
                   </p>
+                )}
+
+                {/* Badge de Sinal Pago */}
+                {!isCompleted && !isCancelled && appt.deposit_paid && (
+                   <div className="mb-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                      ✅ Sinal Pago (R$ {depositAmount.toFixed(2)})
+                   </div>
+                )}
+                
+                {/* Indicador de Restante a Pagar */}
+                {!isCompleted && !isCancelled && (
+                   <p className="text-xs text-gray-400 mb-2">
+                     {appt.deposit_paid 
+                        ? `Restam R$ ${(servicePrice - depositAmount).toFixed(2)} para receber`
+                        : `Valor total a receber: R$ ${servicePrice.toFixed(2)}`
+                     }
+                   </p>
                 )}
 
                 {/* Notas do Agendamento */}
@@ -345,6 +415,29 @@ const Dashboard: React.FC<DashboardProps> = ({ services }) => {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Checkbox de Sinal */}
+              <div className="bg-[#A0814A]/5 p-3 rounded-lg border border-[#A0814A]/10">
+                 <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={formDepositPaid}
+                          onChange={e => setFormDepositPaid(e.target.checked)}
+                          className="w-5 h-5 accent-[#A0814A] rounded focus:ring-[#A0814A]"
+                        />
+                        <span className="text-sm font-semibold text-gray-700">Sinal (30%) Pago?</span>
+                    </label>
+                    <span className="text-sm font-bold text-[#A0814A]">
+                       R$ {depositValue.toFixed(2)}
+                    </span>
+                 </div>
+                 <p className="text-[10px] text-gray-500 mt-1 pl-7">
+                    {formDepositPaid 
+                      ? 'Este valor entrará no faturamento imediatamente.' 
+                      : 'Marque se a cliente já adiantou o valor.'}
+                 </p>
               </div>
 
               <div>

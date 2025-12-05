@@ -24,7 +24,7 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
         <div className="w-20 h-20 bg-[#A0814A]/10 rounded-full flex items-center justify-center mx-auto mb-4">
            <span className="text-3xl">💅</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Studio Sabrina</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">Studio Sabrina Azeredo</h1>
         <p className="text-gray-500 mb-6 text-sm">Área Administrativa</p>
         
         <form onSubmit={handleSubmit} className="space-y-4">

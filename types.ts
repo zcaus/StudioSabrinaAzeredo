@@ -19,11 +19,12 @@ export interface Appointment {
   date: string; // ISO String
   status: AppointmentStatus;
   notes?: string;
+  deposit_paid?: boolean; // Indica se os 30% foram adiantados
 }
 
 export interface RevenueStats {
-  predicted: number; // Pending
-  realized: number; // Completed
+  predicted: number; // A Receber (Saldo restante)
+  realized: number; // Faturamento (Já pago: Completos + Sinais)
 }
 
 export type ViewState = 'LOGIN' | 'DASHBOARD' | 'SERVICES' | 'SETTINGS';
