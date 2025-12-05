@@ -11,12 +11,11 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple PIN protection for the "Demo" experience. 
-    // In a real Supabase Auth flow, we would use supabase.auth.signInWithPassword
-    if (password === '1234' || password === 'admin') {
+    // Simple PIN protection
+    if (password === '2805') {
       onLogin();
     } else {
-      alert("Senha incorreta. (Dica: tente 1234)");
+      alert("Senha incorreta.");
     }
   };
 
@@ -41,7 +40,6 @@ const Login: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
             Entrar
           </button>
         </form>
-        <p className="mt-4 text-xs text-gray-400">Dica: senha é "1234"</p>
       </div>
     </div>
   );
